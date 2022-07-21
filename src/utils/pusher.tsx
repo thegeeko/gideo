@@ -8,12 +8,9 @@ type PusherStore = {
   channel: Channel;
 };
 
-const createPusherStore = (roomId: string) => {
+export const createPusherStore = (roomId: string) => {
   const client = new PusherJS(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
     cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-    forceTLS: false,
-    disableStats: true,
-    enabledTransports: ["ws", "wss"],
   });
 
   const channel = client.subscribe(roomId);
@@ -40,10 +37,6 @@ export const PusherProvider: React.FC<
 
     return () => {
       const pusher = newStore.getState().client;
-      console.log("disconnecting pusher and destroying store", pusher);
-      console.log(
-        "(Expect a warning in terminal after this, React Dev Mode and all)"
-      );
       pusher.disconnect();
       newStore.destroy();
     };
@@ -59,7 +52,7 @@ export const PusherProvider: React.FC<
 };
 
 export function useSubscribeToEvent<MessageType>(
-  eventName: string,
+  eventName: "message" | "proposal" | "answer",
   callback: (data: MessageType) => void
 ) {
   const channel = usePusherZustandStore((state) => state.channel);

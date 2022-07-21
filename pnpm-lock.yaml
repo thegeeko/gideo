@@ -14,10 +14,12 @@ specifiers:
   daisyui: ^2.19.0
   eslint: 8.18.0
   eslint-config-next: 12.2.1
+  eslint-plugin-react-hooks: ^4.6.0
   next: 12.2.1
   next-auth: ^4.10.1
   postcss: ^8.4.14
   prisma: ^4.1.0
+  pusher-js: ^7.2.0
   react: 18.2.0
   react-dom: 18.2.0
   react-query: 3.39.2
@@ -36,6 +38,7 @@ dependencies:
   '@trpc/server': 9.26.2
   next: 12.2.1_biqbaboplfbrettd7655fr4n2y
   next-auth: 4.10.1_biqbaboplfbrettd7655fr4n2y
+  pusher-js: 7.2.0
   react: 18.2.0
   react-dom: 18.2.0_react@18.2.0
   react-query: 3.39.2_biqbaboplfbrettd7655fr4n2y
@@ -51,6 +54,7 @@ devDependencies:
   daisyui: 2.19.0_ugi4xkrfysqkt4c4y6hkyfj344
   eslint: 8.18.0
   eslint-config-next: 12.2.1_b5e7v2qnwxfo6hmiq56u52mz3e
+  eslint-plugin-react-hooks: 4.6.0_eslint@8.18.0
   postcss: 8.4.14
   prisma: 4.1.0
   tailwindcss: 3.1.6
@@ -2075,6 +2079,12 @@ packages:
     engines: {node: '>=6'}
     dev: true
 
+  /pusher-js/7.2.0:
+    resolution: {integrity: sha512-4JO/RnuP+z1/nU5w6AmHNXov4NIe/PbbVVGnD1Uroab0lStmGxJs+KexMqTcZW0BXe2zOqd/50ZqJ1YjzxwnVw==}
+    dependencies:
+      tweetnacl: 1.0.3
+    dev: false
+
   /queue-microtask/1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
     dev: true
@@ -2409,6 +2419,10 @@ packages:
       tslib: 1.14.1
       typescript: 4.7.4
     dev: true
+
+  /tweetnacl/1.0.3:
+    resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
+    dev: false
 
   /type-check/0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}

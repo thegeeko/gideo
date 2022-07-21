@@ -6,8 +6,14 @@ generator client {
 }
 
 datasource db {
-    provider = "postgres" // NOTE: sqlite does not work with NextAuth.js
+    provider = "postgres"
     url      = env("DATABASE_URL")
+}
+
+model Room {
+    id    String @id @unique
+    Owner User   @relation(fields: [id], references: [id])
+    name  String
 }
 
 // Necessary for Next auth
@@ -45,6 +51,7 @@ model User {
     image         String?
     accounts      Account[]
     sessions      Session[]
+    Room          Room?
 }
 
 model VerificationToken {
