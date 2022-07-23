@@ -3,50 +3,76 @@ import NoSSR from "../../components/NoSSR";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { trpc } from "../../utils/trpc";
-import { useEffect, useState } from "react";
-import { PusherProvider, useSubscribeToEvent } from "../../utils/pusher";
-
-const RoomView: React.FC<{
-  roomId: string;
-  isOwner: boolean;
-}> = ({ isOwner, roomId }) => {
-  const [msgs, setMsgs] = useState<string[]>([]);
-  useSubscribeToEvent<{ body: string }>("message", (msg) => {
-    console.log(msg);
-    setMsgs([...msgs, msg.body]);
-  });
-
-  return (
-    <div className="container mx-auto flex flex-col items-center justify-center h-screen p-4">
-      {isOwner && <div> {msgs.map((msg) => msg)}</div>}
-      {!isOwner && <div> </div>}
-    </div>
-  );
-};
+import { GhLogo, GoogleLogo } from "../../components/logos";
+import { PusherProvider } from "../../utils/pusher";
+import { useSession, signIn } from "next-auth/react";
+import RoomView from "../../components/RoomView";
 
 const Room: NextPage = () => {
-  const { query } = useRouter();
+  const { query, push: routerPush } = useRouter();
   const id = query.id as string;
-
-  const { data: room, status: roomStatus } = trpc.useQuery([
-    "room.get-by-id",
-    { id },
-  ]);
+  const { data: session, status: authStatus } = useSession();
+  const { data: room, status: roomStatus } = trpc.useQuery(
+    ["room.get-by-id", { id }],
+    {
+      onError(err) {
+        if (err.data?.code === "NOT_FOUND") {
+          routerPush("/");
+        }
+      },
+    }
+  );
 
   return (
     <>
       <Head>
-        <title>{room?.room?.name}</title>
+        <title>{room?.name || "Room"}</title>
         <meta name="description" content="a video chat room" />
-        <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className="container mx-auto flex flex-col items-center justify-center h-screen p-4">
-        {roomStatus == "loading" && <div>Loading ...</div>}
-        {roomStatus == "success" && room.room && (
+      <main className="mx-auto flex flex-col items-center justify-center h-screen">
+        {authStatus === "loading" && (
+          <div className="animate-pulse"> Loading... </div>
+        )}
+
+        {authStatus === "unauthenticated" && (
+          <div className="text-center">
+            <div className="text-3xl">You need to login to access the room</div>
+            <div className="pt-10" />
+            <button
+              className="btn bg-black font-bold text-xl"
+              onClick={() => signIn("github")}
+            >
+              <GhLogo />
+              <span className="pr-2" />
+              Github
+            </button>
+            <span className="divider">Or</span>
+            <button
+              className="btn bg-black font-bold text-xl"
+              onClick={() => signIn("google")}
+            >
+              <GoogleLogo />
+              <span className="pr-2" />
+              Google
+            </button>
+          </div>
+        )}
+
+        {authStatus === "authenticated" && roomStatus === "loading" && (
+          <div className="animate-pulse"> Loading room... </div>
+        )}
+
+        {authStatus === "authenticated" && room && (
           <NoSSR>
-            <PusherProvider roomId={room.room.id}>
-              <RoomView isOwner={room.isOwner} roomId={room.room.id} />
+            <PusherProvider
+              roomId={room.id}
+              userInfo={{
+                id: session!.user!.id!,
+                name: session.user!.name!,
+              }}
+            >
+              <RoomView isOwner={room.isOwner} roomId={room.id} />
             </PusherProvider>
           </NoSSR>
         )}

@@ -1,11 +1,12 @@
 import create, { StoreApi } from "zustand/vanilla";
 import createContext from "zustand/context";
-import PusherJS, { PresenceChannel } from "pusher-js";
+import PusherJS, { Members, PresenceChannel } from "pusher-js";
 import { useEffect, useRef, useState } from "react";
 
 type PusherStore = {
   client: PusherJS;
   channel: PresenceChannel;
+  members: { [id: string]: { name: string } };
 };
 
 type UserInfo = {
@@ -13,7 +14,7 @@ type UserInfo = {
   name: string;
 };
 
-// PusherJS.logToConsole = true;
+PusherJS.logToConsole = true;
 
 export const createPusherStore = (roomId: string, userInfo: UserInfo) => {
   const client = new PusherJS(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
@@ -37,17 +38,31 @@ export const createPusherStore = (roomId: string, userInfo: UserInfo) => {
   });
 
   client.signin();
-  const channel = client.subscribe(roomId);
-  (window as any).c = channel;
+  const channel = client.subscribe(roomId) as PresenceChannel;
 
   channel.bind("pusher:error", (error: any) => {
     console.error(error);
   });
 
-  return create<PusherStore>(() => ({
+  const store = create<PusherStore>(() => ({
     client: client,
-    channel: channel as PresenceChannel,
+    channel: channel,
+    members: channel.members.members,
   }));
+
+  // Update helper that sets 'members' to contents of presence channel's current members
+  const updateMembers = () => {
+    store.setState(() => ({
+      members: channel.members.members,
+    }));
+  };
+
+  // Bind all "present users changed" events to trigger updateMembers
+  channel.bind("pusher:subscription_succeeded", updateMembers);
+  channel.bind("pusher:member_added", updateMembers);
+  channel.bind("pusher:member_removed", updateMembers);
+
+  return store;
 };
 
 const {
@@ -83,19 +98,30 @@ export const PusherProvider: React.FC<
   );
 };
 
+export enum EventsNames {
+  UserJoined = "user-joined",
+  UserLeft = "user-left",
+  Message = "message",
+}
+
 type MessageEvent = {
-  name: "message";
+  name: EventsNames.Message;
   callback: ({ body }: { body: string }) => void;
 };
 
 type UserJoinedEvent = {
-  name: "user-joined";
-  callback: ({ userId }: { userId: string }) => void;
+  name: EventsNames.UserJoined;
+  callback: ({ user_id }: { user_id: string }) => void;
 };
 
-type Event = MessageEvent | UserJoinedEvent;
+type UserLeftEvent = {
+  name: EventsNames.UserLeft;
+  callback: ({ user_id }: { user_id: string }) => void;
+};
 
-export function useSubscribeToEvent({ name, callback }: Event) {
+type Event = MessageEvent | UserJoinedEvent | UserLeftEvent;
+
+export function useSubscribeToChannelEvent({ name, callback }: Event) {
   const channel = usePusherZustandStore((store) => store.channel);
   const stableCallback = useRef(callback);
   // Keep callback sync'd
@@ -109,18 +135,37 @@ export function useSubscribeToEvent({ name, callback }: Event) {
     channel.bind(name, reference);
     return () => {
       channel.unbind(name, reference);
+      console.log("unbinded");
     };
   }, [channel, name]);
 }
 
-export const useMembersCount = () => {
-  const channel = usePusherZustandStore((store) => store.channel);
-
-  const [members, setMembers] = useState<typeof channel.members>();
+export function useSubscribeToUserEvent({ name, callback }: Event) {
+  const client = usePusherZustandStore((store) => store.client);
+  const stableCallback = useRef(callback);
+  // Keep callback sync'd
   useEffect(() => {
-    setMembers(channel.members);
-    console.log("upadte");
-  }, [channel]);
+    stableCallback.current = callback;
+  }, [callback]);
+  useEffect(() => {
+    const reference = (data: any) => {
+      stableCallback.current(data);
+    };
+    client.user.bind(name, reference);
+    return () => {
+      client.user.unbind(name, reference);
+      console.log("unbinded");
+    };
+  }, [client, name]);
+}
+
+export const useCurrentMembers = () => {
+  const membersStore = usePusherZustandStore((store) => store.members);
+  const [members, setMembers] = useState(membersStore);
+
+  useEffect(() => {
+    setMembers(membersStore);
+  }, [membersStore]);
 
   return members;
 };

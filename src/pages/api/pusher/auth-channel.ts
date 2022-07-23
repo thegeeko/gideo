@@ -23,8 +23,6 @@ export default function pusherAuthUserEndpoint(
     return;
   }
 
-  console.log(req.body, "\n", req.headers);
-
   const auth = pusherServerClient.authorizeChannel(socket_id, channel_name, {
     user_id,
     user_info: {
