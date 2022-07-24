@@ -50,7 +50,7 @@ const MessageView: React.FC<{ roomId: string }> = ({ roomId }) => {
       const senderName =
         msg.senderId == currentMembers.myID
           ? "You"
-          : (currentMembers.get(msg.senderId)?.name as string);
+          : (currentMembers.members[msg.senderId] || {}).name;
       setMessages((prev) => [
         ...prev,
         {
@@ -135,7 +135,7 @@ const RoomView: React.FC<{
   // maybe a component for this?
   return (
     <div className="mx-auto flex justify-around h-screen py-4">
-      {isOwner && localStream && (
+      {localStream && (
         <>
           <div className="w-7/12">
             <div className="aspect-video  rounded-md overflow-hidden">
@@ -144,11 +144,6 @@ const RoomView: React.FC<{
           </div>
           <MessageView roomId={roomId} />
         </>
-      )}
-      {!isOwner && (
-        <div>
-          <button>Msg</button>
-        </div>
       )}
     </div>
   );
