@@ -11,11 +11,10 @@ datasource db {
 }
 
 model Room {
-    id      String  @id @unique
-    Owner   User    @relation(fields: [id], references: [id])
-    Guest   User?   @relation(fields: [GuestId], references: [id], name: "Guest")
-    GuestId String? @unique
-    name    String
+    id    String  @id @unique
+    owner User    @relation(fields: [id], references: [id])
+    name  String
+    full  Boolean @default(false)
 }
 
 // Necessary for Next auth
@@ -54,7 +53,6 @@ model User {
     accounts      Account[]
     sessions      Session[]
     Room          Room?
-    RoomGuest     Room?     @relation(name: "Guest")
 }
 
 model VerificationToken {

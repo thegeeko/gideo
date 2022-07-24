@@ -1,12 +1,12 @@
 import create, { StoreApi } from "zustand/vanilla";
 import createContext from "zustand/context";
 import PusherJS, { Members, PresenceChannel } from "pusher-js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type PusherStore = {
   client: PusherJS;
   channel: PresenceChannel;
-  members: { [id: string]: { name: string } };
+  members: Members;
 };
 
 type UserInfo = {
@@ -47,13 +47,13 @@ export const createPusherStore = (roomId: string, userInfo: UserInfo) => {
   const store = create<PusherStore>(() => ({
     client: client,
     channel: channel,
-    members: channel.members.members,
+    members: channel.members,
   }));
 
   // Update helper that sets 'members' to contents of presence channel's current members
   const updateMembers = () => {
     store.setState(() => ({
-      members: channel.members.members,
+      members: channel.members,
     }));
   };
 
@@ -76,18 +76,19 @@ export const PusherProvider: React.FC<
     userInfo: { id: string; name: string };
   }>
 > = ({ roomId, children, userInfo }) => {
-  const [store, updateStore] = useState<ReturnType<typeof createPusherStore>>();
+  const [store, setStore] = useState<StoreApi<PusherStore>>();
 
   useEffect(() => {
-    const newStore = createPusherStore(`presence-${roomId}`, userInfo);
-    updateStore(newStore);
+    const str = createPusherStore(`presence-${roomId}`, userInfo);
+    setStore(str);
 
     return () => {
-      const pusher = newStore.getState().client;
+      console.log(str)
+      const pusher = str.getState().client;
       pusher.disconnect();
-      newStore.destroy();
+      str.destroy();
     };
-  }, [roomId, userInfo]);
+  }, []);
 
   if (!store) return null;
 
@@ -106,7 +107,7 @@ export enum EventsNames {
 
 type MessageEvent = {
   name: EventsNames.Message;
-  callback: ({ body }: { body: string }) => void;
+  callback: ({ body, senderId }: { body: string; senderId: string }) => void;
 };
 
 type UserJoinedEvent = {
@@ -124,39 +125,23 @@ type Event = MessageEvent | UserJoinedEvent | UserLeftEvent;
 export function useSubscribeToChannelEvent({ name, callback }: Event) {
   const channel = usePusherZustandStore((store) => store.channel);
   const stableCallback = useRef(callback);
+
+  (window as any).channel = channel;
+
   // Keep callback sync'd
-  useEffect(() => {
+  useLayoutEffect(() => {
     stableCallback.current = callback;
   }, [callback]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const reference = (data: any) => {
+      console.log(`Received event ${name}`);
       stableCallback.current(data);
     };
     channel.bind(name, reference);
     return () => {
       channel.unbind(name, reference);
-      console.log("unbinded");
     };
   }, [channel, name]);
-}
-
-export function useSubscribeToUserEvent({ name, callback }: Event) {
-  const client = usePusherZustandStore((store) => store.client);
-  const stableCallback = useRef(callback);
-  // Keep callback sync'd
-  useEffect(() => {
-    stableCallback.current = callback;
-  }, [callback]);
-  useEffect(() => {
-    const reference = (data: any) => {
-      stableCallback.current(data);
-    };
-    client.user.bind(name, reference);
-    return () => {
-      client.user.unbind(name, reference);
-      console.log("unbinded");
-    };
-  }, [client, name]);
 }
 
 export const useCurrentMembers = () => {
@@ -165,7 +150,8 @@ export const useCurrentMembers = () => {
 
   useEffect(() => {
     setMembers(membersStore);
-  }, [membersStore]);
+    console.log("members updated");
+  }, [membersStore, membersStore.count]);
 
   return members;
 };

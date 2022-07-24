@@ -3,6 +3,7 @@ import z from "zod";
 import { TRPCError } from "@trpc/server";
 import { pusherServerClient } from "../common/pusher";
 import { EventsNames } from "../../utils/pusher";
+import { assert } from "console";
 
 const roomRouter = createRouter()
   .query("get-by-id", {
@@ -55,6 +56,7 @@ const roomRouter = createRouter()
         },
         update: {
           name: input.name,
+          full: false,
         },
       });
     },
@@ -64,15 +66,28 @@ const roomRouter = createRouter()
       roomId: z.string().length(25),
     }),
     resolve: async ({ input, ctx }) => {
-      if (ctx.userId == input.roomId) return;
+      if (ctx.userId === input.roomId) return;
 
-      pusherServerClient.trigger(
-        `presence-${input.roomId}`,
-        EventsNames.UserJoined,
-        {
-          user_id: ctx.userId,
-        }
-      );
+      const full = await ctx.prisma.room.findUnique({
+        where: {
+          id: input.roomId,
+        },
+        select: {
+          full: true,
+        },
+      });
+
+      if (full?.full === false) {
+        await pusherServerClient.trigger(
+          `presence-${input.roomId}`,
+          EventsNames.UserJoined,
+          {
+            user_id: ctx.userId,
+          }
+        );
+      } else {
+        throw new TRPCError({ code: "CONFLICT", message: "Room is full" });
+      }
     },
   })
   .mutation("leave", {
@@ -80,9 +95,16 @@ const roomRouter = createRouter()
       roomId: z.string().length(25),
     }),
     resolve: async ({ input, ctx }) => {
-      if (ctx.userId == input.roomId) return;
+      await ctx.prisma.room.update({
+        where: {
+          id: input.roomId,
+        },
+        data: {
+          full: false,
+        },
+      });
 
-      pusherServerClient.trigger(
+      await pusherServerClient.trigger(
         `presence-${input.roomId}`,
         EventsNames.UserLeft,
         {
@@ -91,10 +113,26 @@ const roomRouter = createRouter()
       );
     },
   })
-  .mutation("propose", {
+  .mutation("message", {
     input: z.object({
       roomId: z.string().length(25),
-      propose: z.object({}),
+      message: z.string().max(255),
+    }),
+    resolve: async ({ input, ctx }) => {
+      await pusherServerClient.trigger(
+        `presence-${input.roomId}`,
+        EventsNames.Message,
+        {
+          body: input.message,
+          senderId: ctx.userId,
+        }
+      );
+    },
+  })
+  .mutation("offer", {
+    input: z.object({
+      roomId: z.string().length(25),
+      offer: z.object({}),
     }),
     async resolve({ input, ctx }) {},
   });
