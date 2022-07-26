@@ -132,9 +132,78 @@ const roomRouter = createRouter()
   .mutation("offer", {
     input: z.object({
       roomId: z.string().length(25),
-      offer: z.object({}),
+      offer: z.object({
+        type: z.string(),
+        sdp: z.string(),
+      }),
     }),
-    async resolve({ input, ctx }) {},
+    async resolve({ input, ctx }) {
+      const data = JSON.stringify({
+        offer: input.offer,
+        senderId: ctx.userId,
+      });
+
+      const half = Math.ceil(data.length / 2);
+      const [part1, part2] = [data.slice(0, half), data.slice(half)];
+
+      await pusherServerClient.trigger(
+        `presence-${input.roomId}`,
+        EventsNames.CHUNKED_Offer,
+        {
+          index: 0,
+          data: part1,
+          isLast: false,
+        }
+      );
+
+      await pusherServerClient.trigger(
+        `presence-${input.roomId}`,
+        EventsNames.CHUNKED_Offer,
+        {
+          index: 1,
+          data: part2,
+          isLast: true,
+        }
+      );
+    },
+  })
+  .mutation("answer", {
+    input: z.object({
+      roomId: z.string().length(25),
+      offer: z.object({
+        type: z.string(),
+        sdp: z.string(),
+      }),
+    }),
+    async resolve({ input, ctx }) {
+      const data = JSON.stringify({
+        answer: input.offer,
+        senderId: ctx.userId,
+      });
+
+      const half = Math.ceil(data.length / 2);
+      const [part1, part2] = [data.slice(0, half), data.slice(half)];
+
+      await pusherServerClient.trigger(
+        `presence-${input.roomId}`,
+        EventsNames.CHUNKED_Answer,
+        {
+          index: 0,
+          data: part1,
+          isLast: false,
+        }
+      );
+
+      await pusherServerClient.trigger(
+        `presence-${input.roomId}`,
+        EventsNames.CHUNKED_Answer,
+        {
+          index: 1,
+          data: part2,
+          isLast: true,
+        }
+      );
+    },
   });
 
 export default roomRouter;

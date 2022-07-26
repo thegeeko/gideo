@@ -1,4 +1,5 @@
-import create, { StoreApi } from "zustand/vanilla";
+import createVanilla, { StoreApi } from "zustand/vanilla";
+import createReactStore from "zustand/react";
 import createContext from "zustand/context";
 import PusherJS, { Members, PresenceChannel } from "pusher-js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -44,7 +45,7 @@ export const createPusherStore = (roomId: string, userInfo: UserInfo) => {
     console.error(error);
   });
 
-  const store = create<PusherStore>(() => ({
+  const store = createVanilla<PusherStore>(() => ({
     client: client,
     channel: channel,
     members: channel.members,
@@ -83,7 +84,7 @@ export const PusherProvider: React.FC<
     setStore(str);
 
     return () => {
-      console.log(str)
+      console.log(str);
       const pusher = str.getState().client;
       pusher.disconnect();
       str.destroy();
@@ -103,6 +104,8 @@ export enum EventsNames {
   UserJoined = "user-joined",
   UserLeft = "user-left",
   Message = "message",
+  CHUNKED_Answer = "answer",
+  CHUNKED_Offer = "chunked-offer",
 }
 
 type MessageEvent = {
@@ -120,9 +123,31 @@ type UserLeftEvent = {
   callback: ({ user_id }: { user_id: string }) => void;
 };
 
-type Event = MessageEvent | UserJoinedEvent | UserLeftEvent;
+type Offer = {
+  name: EventsNames.CHUNKED_Offer;
+  callback: ({
+    offer,
+    senderId,
+  }: {
+    senderId: string;
+    offer: RTCSessionDescriptionInit;
+  }) => void;
+};
 
-export function useSubscribeToChannelEvent({ name, callback }: Event) {
+type Answer = {
+  name: EventsNames.CHUNKED_Answer;
+  callback: ({
+    answer,
+    senderId,
+  }: {
+    senderId: string;
+    answer: RTCSessionDescriptionInit;
+  }) => void;
+};
+
+type Event = MessageEvent | UserJoinedEvent | UserLeftEvent | Offer | Answer;
+
+export function useSubscribeToEvent({ name, callback }: Event) {
   const channel = usePusherZustandStore((store) => store.channel);
   const stableCallback = useRef(callback);
 
@@ -140,6 +165,58 @@ export function useSubscribeToChannelEvent({ name, callback }: Event) {
     channel.bind(name, reference);
     return () => {
       channel.unbind(name, reference);
+    };
+  }, [channel, name]);
+}
+
+export function useSubscribeToChunkedEvent({ name, callback }: Event) {
+  const channel = usePusherZustandStore((store) => store.channel);
+  const stableCallback = useRef(callback);
+
+  type Chunk = { index: number; data: string; isLast: boolean };
+
+  const ChunksRef = useRef<Chunk[]>([]);
+
+  const allChunksHere = () => {
+    const sorted = ChunksRef.current.sort((a, b) => a.index - b.index);
+
+    const last = sorted[sorted.length - 1];
+    const first = sorted[0];
+
+    if (last && last.isLast && first && first.index === 0) {
+      console.log(sorted);
+      const body = sorted.map((c) => c.data).join("");
+      stableCallback.current(JSON.parse(body));
+      ChunksRef.current = [];
+    } else {
+      console.log("Not all chunks here");
+    }
+  };
+
+  // Keep callback sync'd
+  useLayoutEffect(() => {
+    stableCallback.current = callback;
+  }, [callback]);
+
+  useLayoutEffect(() => {
+    const chunksHandler = (chunk: Chunk) => {
+      const currChunks = ChunksRef.current;
+
+      const duplicateChunk = currChunks.findIndex(
+        (c) => c.index === chunk.index
+      );
+
+      // ignore if we already have this chunk
+      if (duplicateChunk === -1) {
+        ChunksRef.current.push(chunk);
+        if (chunk.isLast) allChunksHere();
+      }
+    };
+
+    channel.bind(name, chunksHandler);
+
+    return () => {
+      channel.unbind(name, chunksHandler);
     };
   }, [channel, name]);
 }
