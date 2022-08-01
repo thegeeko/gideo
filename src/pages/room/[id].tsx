@@ -30,7 +30,7 @@ const Room: NextPage = () => {
         <meta name="description" content="a video chat room" />
       </Head>
 
-      <main className="mx-auto flex flex-col items-center justify-center h-screen">
+      <main>
         {authStatus === "loading" && (
           <div className="animate-pulse"> Loading... </div>
         )}

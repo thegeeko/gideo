@@ -26,7 +26,6 @@ const VideoPlayer: React.FC<{ stream: MediaStream; muted: boolean }> = ({
       <video
         autoPlay
         playsInline
-        id="sa"
         muted={muted}
         ref={videoRef}
         className="w-full h-full"
@@ -101,20 +100,34 @@ const RoomView: React.FC<{
   }, [joinRoom, leaveRoom, roomId]);
 
   useEffect(() => {
-    const init = async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
+    if (localStream) {
+      localStream.getTracks().forEach((track) => {
+        if (RTCState.peerConnection)
+          RTCState.peerConnection.addTrack(track, localStream);
       });
-      setLocalStream(stream);
+    }
+
+    console.log("track added");
+  }, [RTCState.peerConnection, localStream]);
+
+  useEffect(() => {
+    const init = async () => {
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        setLocalStream(stream);
+      } catch (e) {
+        alert(
+          "sorry but you need to allow access to your camera and microphone"
+        );
+        router.push("/");
+      }
 
       const conn = RTCState.initConnection();
       console.log(RTCState.peerConnection);
-
-      stream.getTracks().forEach((track) => {
-        conn.addTrack(track, stream);
-        console.log("track added");
-      });
 
       conn.ontrack = (e) => {
         e.streams[0]?.getTracks().forEach((track) => {
@@ -132,23 +145,57 @@ const RoomView: React.FC<{
     };
   }, []);
 
+  const handleToggleCam = () => {
+    if (localStream) {
+      localStream.getTracks().forEach((track) => {
+        if (track.kind === "video") track.enabled = !track.enabled;
+      });
+    }
+  };
+
+  const handleToggleMic = () => {
+    if (localStream) {
+      localStream.getTracks().forEach((track) => {
+        if (track.kind === "audio") track.enabled = !track.enabled;
+      });
+    }
+  };
+
   return (
-    <div className="mx-auto flex justify-around h-screen py-4">
+    <div className="flex flex-col lg:flex-row lg:justify-around lg:h-screen w-screen py-4 px-4 lg:px-0">
       {localStream && (
         <>
-          <div className="w-7/12">
-            <div className="aspect-video  rounded-md overflow-hidden">
+          <div className="w-full lg:w-7/12 ">
+            <div className="aspect-video rounded-md overflow-hidden">
               <VideoPlayer
                 muted={true}
                 stream={remoteActive ? remoteStream : localStream}
               />
             </div>
-            <button onClick={() => setRemoteActive(!remoteActive)}>
-              {" "}
-              Switch{" "}
-            </button>
+            <div className="px-6 py-2 mt-5 bg-black flex rounded-md gap-5 justify-center">
+              <button
+                className="btn bg-white text-black rounded-lg"
+                onClick={() => setRemoteActive(!remoteActive)}
+              >
+                switch video
+              </button>
+              <button
+                className="btn bg-white text-black rounded-lg"
+                onClick={handleToggleCam}
+              >
+                toggle cam
+              </button>
+              <button
+                className="btn bg-white text-black rounded-lg"
+                onClick={handleToggleMic}
+              >
+                toggle Mic
+              </button>
+            </div>
           </div>
-          <MessageView roomId={roomId} />
+          <div className="w-full lg:w-4/12">
+            <MessageView roomId={roomId} />
+          </div>
         </>
       )}
     </div>

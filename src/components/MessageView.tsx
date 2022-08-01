@@ -47,8 +47,8 @@ const MessageView: React.FC<{ roomId: string }> = ({ roomId }) => {
   });
 
   return (
-    <div className="w-4/12 h-full rounded-lg bg-white flex flex-col">
-      <div className="h-5/6 flex items-center flex-col-reverse overflow-y-scroll py-4">
+    <div className="w-full h-full rounded-lg bg-white flex flex-col">
+      <div className="h-5/6 flex items-center flex-col-reverse overflow-y-auto s py-4">
         {messages.map((msg, i) => (
           <div className="max-w-[80%] mt-4 mb-6" key={i}>
             <div className="bg-black  rounded-md text-white text-lg px-4 py-2">
